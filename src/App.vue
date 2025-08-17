@@ -119,7 +119,7 @@ const onImageLoad = (e) => {
   canvas.value.style.height = `${img.height}px`;
   // img宽高除以原始宽高
   ratio.value = img.width / img.naturalWidth;
-
+  console.log(img.width,img.naturalWidth,'狂高')
   setCurrentImageOcr(false);
 };
 
@@ -367,11 +367,18 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="body">
+        <div class="body" id="body">
           <div class="body-content" :class="bodyRotateClass">
-            <img
+            <!-- <img
               class="body-content-img"
               :src="currentImage?.imageUrl"
+              @load="onImageLoad"
+              @error="onImageError"
+              alt=""
+            /> -->
+            <img
+              class="body-content-img"
+              src="/img/1.png"
               @load="onImageLoad"
               @error="onImageError"
               alt=""
@@ -402,12 +409,7 @@ onMounted(() => {
             <a-button class="control-btn" @click="handleExport">导出数据</a-button >
           </div>
 
-          <div class="control-item">
-            <a-input v-model:value="customNumber" placeholder="手动新增编号" />
-            <a-button class="control-btn" @click="handleCustomAdd"
-              >手动添加</a-button
-            >
-          </div>
+          
         </div>
       </div>
       <div class="result-list">
@@ -425,6 +427,12 @@ onMounted(() => {
             {{ item.isEdit ? "保存" : "编辑" }}
           </a-button>
         </div>
+        <div class="result-item">
+            <a-input v-model:value="customNumber" placeholder="手动新增编号" />
+            <a-button class="control-btn" @click="handleCustomAdd"
+              >手动添加</a-button
+            >
+          </div>
       </div>
 
       <div class="loading-box" v-if="loading">
@@ -456,7 +464,8 @@ onMounted(() => {
   .result-list {
     padding-top: 4rem;
     box-sizing: border-box;
-    width: 256px;
+    width: 246px;
+    margin-left: 10px;
     .result-item {
       display: flex;
       align-items: center;
@@ -483,11 +492,12 @@ onMounted(() => {
     position: relative;
     .body-content {
       position: relative;
-      transform-origin: center center;
+      transform-origin: top left;
       .body-content-img {
         display: block;
         width: 1000px;
-        height: auto;
+        height: 600px;
+        object-fit: contain;
       }
       .body-content-canvas {
         position: absolute;

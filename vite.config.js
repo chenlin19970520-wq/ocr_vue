@@ -15,4 +15,13 @@ export default defineConfig({
       ],
     }),
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://yingyunkeji.top/',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '/api')  // Adjust if needed
+      }
+    }
+  }
 });
