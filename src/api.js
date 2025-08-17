@@ -1,8 +1,6 @@
 import { message } from "ant-design-vue";
 
-export const proxyUrl = "http://yingyunkeji.top:8089";
-// export const proxyUrl = "";
-
+export const proxyUrl = "http://yingyunkeji.top:8089/";
 export const Fetch = (url, params, options = {}) => {
   const newOptions = {
     method: "POST",
