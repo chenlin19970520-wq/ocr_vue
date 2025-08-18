@@ -570,7 +570,7 @@ onMounted(() => {
   height: 100vh;
   min-width: 1920px;
   min-height: 1080px;
-  padding:1rem;
+  padding:1rem 3rem;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
