@@ -17,6 +17,7 @@ const canvas = ref(null);
 const currentDay = ref(dayjs("2025-08-14").format("YYYY-MM-DD"));
 const ratio = ref(1); // 比例
 const rotateValue = ref(0); // 旋转角度
+const scale = ref(1); // 缩放比例
 const loading = ref(false); // 加载
 const currentPage = ref(1); // 当前页
 const size = ref(1); // 每页大小
@@ -27,11 +28,19 @@ const resultList = ref([]); // 结果列表
 const currentResult = ref([]); // 当前结果
 const ocrType = ref("BAI_DU"); // OCR识别类型 百度或讯飞
 
+
 const customNumber = ref();
 
-const bodyRotateClass = computed(() => {
-  return `rotate-${rotateValue.value}`;
-});
+const transform = computed(() => {
+    return `rotate(${rotateValue.value}deg) scale(${scale.value})`;
+})
+
+const showCurrentResult = computed(()=>{
+  return currentResult.value.filter(item=>{
+    return item.text !== '__NO_OCR_RESULT__'
+  })
+})
+
 
 // 格式化orc识别结果
 const filterOcrData = (data) => {
@@ -43,23 +52,15 @@ const filterOcrData = (data) => {
   });
 };
 /**
- * 加载当前角度数据，根据ocr类型
+ * 加载当前角度数据，根据当前选择ocr类型
  */
 const handleLoadOcr = () => {
-  // if (ocrType.value === "BAI_DU") {
-  //   currentResult.value = filterOcrData(currentImage.value.baiduOcr || []);
-  // } else {
-  //   currentResult.value = filterOcrData(currentImage.value.xunfeiOcr || []);
-  // }
-  // resultList.value[currentPage.value] = currentResult.value;
-  // filterData(currentResult.value);
-  setCurrentImageOcr()
+  setCurrentImageOcr();
 };
 // 设置当前图片对应的orc识别结果
 // 如果有保存结果，取保存结果
 // To Do 如果没有baiduOcr与xunfeiOcr的话，需要调用结果获取
 const setCurrentImageOcr = (isOcrType = true) => {
-  console.log(currentImage.value, "当前图片");
   if (currentImage.value?.result && !isOcrType) {
     currentResult.value = currentImage.value.result.map((item) => {
       return {
@@ -73,10 +74,11 @@ const setCurrentImageOcr = (isOcrType = true) => {
     ocrType.value = currentImage.value.result[0].vendor;
   } else if (ocrType.value === "BAI_DU") {
     currentResult.value = filterOcrData(currentImage.value.baiduOcr || []);
-  } else {
+  } else if (ocrType.value === "XUN_FEI") {
     currentResult.value = filterOcrData(currentImage.value.xunfeiOcr || []);
+  } else if (ocrType.value === "GU_GE") {
+    currentResult.value = filterOcrData(currentImage.value.googleOcr || []);
   }
-  console.log(currentResult.value);
   if (currentResult.value) {
     resultList.value[currentPage.value] = currentResult.value;
     filterData(currentResult.value);
@@ -88,9 +90,7 @@ const setCurrentImageOcr = (isOcrType = true) => {
       vendor: ocrType.value,
     };
     OcrBaiduApi(params)
-      .then((res) => {
-        console.log(res, "--");
-        currentResult.value = filterOcrData(res);
+      .then((res) => {        currentResult.value = filterOcrData(res);
         filterData(currentResult.value);
         loading.value = false;
       })
@@ -110,16 +110,51 @@ const onImageError = (e) => {
   loading.value = false;
 };
 
+// 根据图片原始宽高获取当前图片宽高
+const getCurrentSize = (img) => {
+  const naturalWidth = img.naturalWidth;
+  const naturalHeight = img.naturalHeight;
+  // 判断是横图，还是竖图;
+  if(naturalWidth > naturalHeight) {
+    // 横图
+    const widthScale = naturalWidth / 1000;
+    const heightNumber = naturalHeight / widthScale;// 获取高度
+    return {
+      width: 1000,
+      height: heightNumber,
+      diff: (600 - heightNumber)/2, //获取高度差
+      type: 'width',
+    }
+  }else{
+    const heightScale = naturalHeight / 600;// 获取高度
+    const widthNumber = naturalWidth / heightScale;// 获取宽度
+    return {
+      width: widthNumber,
+      height: 600,
+      diff: (1000 - widthNumber)/2, //获取宽度差
+      type:'height'
+    }
+  }
+
+}
+
 // 图片加载后设置canvas大小
 const onImageLoad = (e) => {
   const img = e.target;
-  canvas.value.width = img.width;
-  canvas.value.height = img.height;
-  canvas.value.style.width = `${img.width}px`;
-  canvas.value.style.height = `${img.height}px`;
+  const { width, height, diff ,type} = getCurrentSize(img);
+  canvas.value.width = width;
+  canvas.value.height = height;
+  canvas.value.style.width = `${width}px`;
+  canvas.value.style.height = `${height}px`;
+  if(type === 'width'){
+    canvas.value.style.top = `${diff}px`;
+    canvas.value.style.left = '0px';
+  }else{
+    canvas.value.style.top = '0px';
+    canvas.value.style.left = `${diff}px`;
+  }
   // img宽高除以原始宽高
-  ratio.value = img.width / img.naturalWidth;
-  console.log(img.width,img.naturalWidth,'狂高')
+  ratio.value = width / img.naturalWidth;
   setCurrentImageOcr(false);
 };
 
@@ -156,6 +191,7 @@ const filterData = (arr) => {
  */
 const handleToChange = () => {
   rotateValue.value = (rotateValue.value + 90) % 360;
+  handleSetSize();
 };
 
 /**
@@ -333,6 +369,35 @@ const handleExport = () => {
   exportApi(params);
 };
 
+/**
+ * 设置
+ */
+// 设置auto-box大小
+const handleSetSize = () => {
+    const autoBox = document.querySelector('.auto-box');
+    if(scale.value === 1 && rotateValue.value%180 === 0) {
+        autoBox.style.width = 1000 + 'px';
+        autoBox.style.height = 600 + 'px';
+    }else{
+        autoBox.style.width = 1000 * scale.value + 'px';
+        autoBox.style.height = 1000 * scale.value + 'px';
+
+    }
+}
+// 缩小
+const handleToScaleSmall = () => {
+    if(scale.value > 1) {
+        scale.value -= 0.1;
+    }
+    handleSetSize();
+}
+// 放大
+const handleToScaleBig = () => {
+    if(scale.value < 10) {
+        scale.value += 0.1;
+    }
+    handleSetSize();
+}
 onMounted(() => {
   getImageList();
 });
@@ -363,27 +428,23 @@ onMounted(() => {
             >
               <a-radio-button value="BAI_DU">百度</a-radio-button>
               <a-radio-button value="XUN_FEI">讯飞</a-radio-button>
+              <a-radio-button value="GU_GE">谷歌</a-radio-button>
             </a-radio-group>
           </div>
         </div>
 
         <div class="body" id="body">
-          <div class="body-content" :class="bodyRotateClass">
-            <!-- <img
-              class="body-content-img"
-              :src="currentImage?.imageUrl"
-              @load="onImageLoad"
-              @error="onImageError"
-              alt=""
-            /> -->
-            <img
-              class="body-content-img"
-              src="/img/1.png"
-              @load="onImageLoad"
-              @error="onImageError"
-              alt=""
-            />
-            <canvas ref="canvas" class="body-content-canvas"></canvas>
+          <div class="auto-box">
+            <div class="body-content" :style="{transform: transform}">
+              <img
+                class="body-content-img"
+                :src="currentImage?.imageUrl"
+                @load="onImageLoad"
+                @error="onImageError"
+                alt=""
+              />
+              <canvas ref="canvas" class="body-content-canvas"></canvas>
+            </div>
           </div>
         </div>
 
@@ -406,16 +467,21 @@ onMounted(() => {
           </div>
 
           <div class="control-item">
-            <a-button class="control-btn" @click="handleExport">导出数据</a-button >
+            <a-button class="control-btn" @click="handleExport"
+              >导出数据</a-button
+            >
           </div>
 
-          
+           <div class="control-item">
+            <a-button class="control-btn" @click="handleToScaleSmall">缩小</a-button>
+            <a-button class="control-btn" @click="handleToScaleBig">放大</a-button>
+          </div>
         </div>
       </div>
       <div class="result-list">
         <div
           class="result-item"
-          v-for="(item, index) in currentResult"
+          v-for="(item, index) in showCurrentResult"
           :key="index"
         >
           <a-input
@@ -428,11 +494,11 @@ onMounted(() => {
           </a-button>
         </div>
         <div class="result-item">
-            <a-input v-model:value="customNumber" placeholder="手动新增编号" />
-            <a-button class="control-btn" @click="handleCustomAdd"
-              >手动添加</a-button
-            >
-          </div>
+          <a-input v-model:value="customNumber" placeholder="手动新增编号" />
+          <a-button class="control-btn" @click="handleCustomAdd"
+            >手动添加</a-button
+          >
+        </div>
       </div>
 
       <div class="loading-box" v-if="loading">
@@ -490,13 +556,22 @@ onMounted(() => {
     background-color: rgba(0, 0, 0, 0.1);
     overflow: auto;
     position: relative;
+    .auto-box {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .body-content {
+      width: 1000px;
+      height: 600px;
       position: relative;
-      transform-origin: top left;
+      transform-origin: center center;
       .body-content-img {
         display: block;
-        width: 1000px;
-        height: 600px;
+        width: 100%;
+        height: 100%;
         object-fit: contain;
       }
       .body-content-canvas {

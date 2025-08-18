@@ -1,3 +1,4 @@
+const lineWeight = 2;
 /**
  * 画单独的框,
  * 使用左上、右上、左下、右下点位，line画图
@@ -6,15 +7,15 @@
  * @param color 颜色
  */
 export const drawItem = (item, canvas, color = "green") => {
-
+  
   const ctx = canvas.getContext("2d");
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1 + lineWeight;
   ctx.beginPath();
-  ctx.moveTo(item[0].x, item[0].y);
-  ctx.lineTo(item[1].x, item[1].y);
-  ctx.lineTo(item[2].x, item[2].y);
-  ctx.lineTo(item[3].x, item[3].y);
+  ctx.moveTo(item[0].x - lineWeight, item[0].y - lineWeight);
+  ctx.lineTo(item[1].x + lineWeight, item[1].y - lineWeight);
+  ctx.lineTo(item[2].x + lineWeight, item[2].y + lineWeight);
+  ctx.lineTo(item[3].x - lineWeight, item[3].y + lineWeight);
   ctx.closePath();
   ctx.stroke();
 };
