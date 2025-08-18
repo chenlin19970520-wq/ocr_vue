@@ -1,6 +1,6 @@
 import { message } from "ant-design-vue";
 
-export const proxyUrl = "https://433186e.r37.cpolar.top/";
+export const proxyUrl = "http://2c99b4fd.r21.vip.cpolar.cn/";
 export const Fetch = (url, params, options = {}) => {
   const newOptions = {
     method: "POST",

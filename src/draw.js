@@ -34,7 +34,7 @@ export const removeItem = (item, canvas) => {
   const minY = Math.min(...ys);
   const maxX = Math.max(...xs);
   const maxY = Math.max(...ys);
-  const padding = 2; // 额外填充以确保清除线宽
+  const padding = 2 + lineWeight; // 额外填充以确保清除线宽
   ctx.clearRect(
     minX - padding,
     minY - padding,

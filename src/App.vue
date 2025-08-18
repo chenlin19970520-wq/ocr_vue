@@ -28,19 +28,22 @@ const resultList = ref([]); // 结果列表
 const currentResult = ref([]); // 当前结果
 const ocrType = ref("BAI_DU"); // OCR识别类型 百度或讯飞
 
+const bodySize = ref({
+  width: 0,
+  height: 0,
+}); // 滚动框的大小
 
 const customNumber = ref();
 
 const transform = computed(() => {
-    return `rotate(${rotateValue.value}deg) scale(${scale.value})`;
-})
+  return `rotate(${rotateValue.value}deg) scale(${scale.value})`;
+});
 
-const showCurrentResult = computed(()=>{
-  return currentResult.value.filter(item=>{
-    return item.text !== '__NO_OCR_RESULT__'
-  })
-})
-
+const showCurrentResult = computed(() => {
+  return currentResult.value.filter((item) => {
+    return item.text !== "__NO_OCR_RESULT__";
+  });
+});
 
 // 格式化orc识别结果
 const filterOcrData = (data) => {
@@ -90,7 +93,8 @@ const setCurrentImageOcr = (isOcrType = true) => {
       vendor: ocrType.value,
     };
     OcrBaiduApi(params)
-      .then((res) => {        currentResult.value = filterOcrData(res);
+      .then((res) => {
+        currentResult.value = filterOcrData(res);
         filterData(currentResult.value);
         loading.value = false;
       })
@@ -110,47 +114,63 @@ const onImageError = (e) => {
   loading.value = false;
 };
 
+// 设置body-content大小
+const setBodyContentSize = () => {
+  const bodyContent = document.querySelector(".body-content");
+  bodyContent.style.width = bodySize.value.width + "px";
+  bodyContent.style.height = bodySize.value.height + "px";
+}
+
+// 获取滚动框的大小
+const getBodySize = () => {
+  const body = document.querySelector("#body");
+  const { width, height } = body.getBoundingClientRect();
+  bodySize.value = {
+    width,
+    height,
+  }
+}
+
 // 根据图片原始宽高获取当前图片宽高
 const getCurrentSize = (img) => {
   const naturalWidth = img.naturalWidth;
   const naturalHeight = img.naturalHeight;
   // 判断是横图，还是竖图;
-  if(naturalWidth > naturalHeight) {
+  if (naturalWidth > naturalHeight) {
     // 横图
-    const widthScale = naturalWidth / 1000;
-    const heightNumber = naturalHeight / widthScale;// 获取高度
+    const widthScale = naturalWidth / bodySize.value.width;
+    const heightNumber = naturalHeight / widthScale; // 获取高度
     return {
-      width: 1000,
+      width: bodySize.value.width,
       height: heightNumber,
-      diff: (600 - heightNumber)/2, //获取高度差
-      type: 'width',
-    }
-  }else{
-    const heightScale = naturalHeight / 600;// 获取高度
-    const widthNumber = naturalWidth / heightScale;// 获取宽度
+      diff: (bodySize.value.height - heightNumber) / 2, //获取高度差
+      type: "width",
+    };
+  } else {
+    const heightScale = naturalHeight / bodySize.value.height; // 获取高度
+    const widthNumber = naturalWidth / heightScale; // 获取宽度
     return {
       width: widthNumber,
-      height: 600,
-      diff: (1000 - widthNumber)/2, //获取宽度差
-      type:'height'
-    }
+      height: bodySize.value.height,
+      diff: (bodySize.value.width - widthNumber) / 2, //获取宽度差
+      type: "height",
+    };
   }
-
-}
+};
 
 // 图片加载后设置canvas大小
 const onImageLoad = (e) => {
   const img = e.target;
-  const { width, height, diff ,type} = getCurrentSize(img);
+  const { width, height, diff, type } = getCurrentSize(img);
   canvas.value.width = width;
   canvas.value.height = height;
   canvas.value.style.width = `${width}px`;
   canvas.value.style.height = `${height}px`;
-  if(type === 'width'){
+  if (type === "width") {
     canvas.value.style.top = `${diff}px`;
-    canvas.value.style.left = '0px';
-  }else{
-    canvas.value.style.top = '0px';
+    canvas.value.style.left = "0px";
+  } else {
+    canvas.value.style.top = "0px";
     canvas.value.style.left = `${diff}px`;
   }
   // img宽高除以原始宽高
@@ -232,11 +252,21 @@ const getImageList = () => {
 };
 
 /**
+ * 重置 缩放与旋转
+ */
+const handleResetTransform = () => {
+  scale.value = 1;
+  rotateValue.value = 0;
+  handleSetSize();
+}
+
+/**
  * 上一页
  */
 const handlePrev = () => {
   if (currentPage.value > 1) {
     currentPage.value--;
+    handleResetTransform();
     setCurrentImage();
   }
 };
@@ -246,6 +276,7 @@ const handlePrev = () => {
 const handleNext = () => {
   if (currentPage.value < totalPage.value) {
     currentPage.value++;
+    handleResetTransform();
     if (imageList.value[currentPage.value - 1]) {
       setCurrentImage();
     } else {
@@ -369,36 +400,46 @@ const handleExport = () => {
   exportApi(params);
 };
 
-/**
- * 设置
- */
+
 // 设置auto-box大小
 const handleSetSize = () => {
-    const autoBox = document.querySelector('.auto-box');
-    if(scale.value === 1 && rotateValue.value%180 === 0) {
-        autoBox.style.width = 1000 + 'px';
-        autoBox.style.height = 600 + 'px';
-    }else{
-        autoBox.style.width = 1000 * scale.value + 'px';
-        autoBox.style.height = 1000 * scale.value + 'px';
-
-    }
-}
+  const autoBox = document.querySelector(".auto-box");
+  if (scale.value === 1 && rotateValue.value % 180 === 0) {
+    autoBox.style.width = bodySize.value.width + "px";
+    autoBox.style.height = bodySize.value.height + "px";
+  } else {
+    autoBox.style.width = bodySize.value.width * scale.value + "px";
+    autoBox.style.height = bodySize.value.height * scale.value + "px";
+  }
+};
 // 缩小
 const handleToScaleSmall = () => {
-    if(scale.value > 1) {
-        scale.value -= 0.1;
-    }
-    handleSetSize();
-}
+  if (scale.value > 1) {
+    scale.value -= 0.1;
+  }
+  handleSetSize();
+};
 // 放大
 const handleToScaleBig = () => {
-    if(scale.value < 10) {
-        scale.value += 0.1;
-    }
-    handleSetSize();
-}
+  if (scale.value < 10) {
+    scale.value += 0.1;
+  }
+  handleSetSize();
+};
+
+// 确定删除
+const handleConfirm = (index) => {
+ 
+};
+
+// 取消删除
+const handleCancel = (index) => {
+
+};
+
 onMounted(() => {
+  getBodySize();
+  setBodyContentSize();
   getImageList();
 });
 </script>
@@ -427,15 +468,15 @@ onMounted(() => {
               button-style="solid"
             >
               <a-radio-button value="BAI_DU">百度</a-radio-button>
-              <a-radio-button value="XUN_FEI">讯飞</a-radio-button>
-              <a-radio-button value="GU_GE">谷歌</a-radio-button>
+              <!-- <a-radio-button value="XUN_FEI">讯飞</a-radio-button>
+              <a-radio-button value="GU_GE">谷歌</a-radio-button> -->
             </a-radio-group>
           </div>
         </div>
 
         <div class="body" id="body">
           <div class="auto-box">
-            <div class="body-content" :style="{transform: transform}">
+            <div class="body-content" :style="{ transform: transform }">
               <img
                 class="body-content-img"
                 :src="currentImage?.imageUrl"
@@ -472,9 +513,13 @@ onMounted(() => {
             >
           </div>
 
-           <div class="control-item">
-            <a-button class="control-btn" @click="handleToScaleSmall">缩小</a-button>
-            <a-button class="control-btn" @click="handleToScaleBig">放大</a-button>
+          <div class="control-item">
+            <a-button class="control-btn" @click="handleToScaleSmall"
+              >缩小</a-button
+            >
+            <a-button class="control-btn" @click="handleToScaleBig"
+              >放大</a-button
+            >
           </div>
         </div>
       </div>
@@ -492,6 +537,17 @@ onMounted(() => {
           <a-button class="control-btn" @click="handleEdit(index)">
             {{ item.isEdit ? "保存" : "编辑" }}
           </a-button>
+          <a-popconfirm
+            title="确定删除吗?"
+            ok-text="确定"
+            cancel-text="取消"
+            @confirm="handleDelete"
+            @cancel="handleCancel"
+          >
+            <a-button class="control-btn" danger>
+              删除
+            </a-button>
+          </a-popconfirm>
         </div>
         <div class="result-item">
           <a-input v-model:value="customNumber" placeholder="手动新增编号" />
@@ -512,6 +568,10 @@ onMounted(() => {
 .container-box {
   width: 100vw;
   height: 100vh;
+  min-width: 1920px;
+  min-height: 1080px;
+  padding:1rem;
+  box-sizing: border-box;
   display: flex;
   justify-content: center;
   min-width: calc(1000px + 12rem);
@@ -545,14 +605,15 @@ onMounted(() => {
 }
 .container {
   position: relative;
-
+  width:calc(100% - 246px);
+  height: calc(100%);
   .control-btn {
     margin-left: 6px;
   }
 
   .body {
-    width: 1000px;
-    height: 600px;
+    width: 100%;
+    height: calc(100% - 8rem);
     background-color: rgba(0, 0, 0, 0.1);
     overflow: auto;
     position: relative;
@@ -564,8 +625,8 @@ onMounted(() => {
       justify-content: center;
     }
     .body-content {
-      width: 1000px;
-      height: 600px;
+      width: 0px;
+      height: 0px;
       position: relative;
       transform-origin: center center;
       .body-content-img {
@@ -596,7 +657,7 @@ onMounted(() => {
 
   .control-list {
     margin: 1rem 0rem;
-    width: 1000px;
+    width: 100%;
     display: flex;
     align-items: center;
     .control-item {
