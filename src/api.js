@@ -1,6 +1,7 @@
 import { message } from "ant-design-vue";
 
-export const proxyUrl = "http://2c99b4fd.r21.vip.cpolar.cn/";
+// export const proxyUrl = "http://yingyunkeji.top/";
+export const proxyUrl = "/";
 export const Fetch = (url, params, options = {}) => {
   const newOptions = {
     method: "POST",
@@ -26,7 +27,7 @@ export const Fetch = (url, params, options = {}) => {
       .fetch(requestUrl, newOptions)
       .then((res) => res.json())
       .then((data) => {
-        if (data.code === 0 || data.data.success === true) {
+        if (data.code === 0) {
           resolve(data.data);
         } else {
           reject(data);

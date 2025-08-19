@@ -12,7 +12,7 @@ import {
 } from "./api.js";
 import { changeSizeFunc } from "./size.js";
 import { drawItem, removeItem, clearCanvas } from "./draw.js";
-import { message, Spin, Radio, RadioGroup } from "ant-design-vue";
+import { message, Spin, Radio, RadioGroup, Popconfirm as APopconfirm } from "ant-design-vue";
 const canvas = ref(null);
 const currentDay = ref(dayjs("2025-08-14").format("YYYY-MM-DD"));
 const ratio = ref(1); // 比例
@@ -69,7 +69,7 @@ const setCurrentImageOcr = (isOcrType = true) => {
       return {
         location: item.location,
         confidence: item.confidence,
-        text: item.boxID,
+        text: item.boxID || item.text,
         ocrText: item.ocrText,
       };
     });
@@ -248,7 +248,11 @@ const getImageList = () => {
     if (imageList.value.length) {
       setCurrentImage();
     }
-  });
+  }).catch(err => {
+    console.log(err)
+    loading.value = false;
+    message.error(err.msg)
+  })
 };
 
 /**
@@ -316,6 +320,10 @@ const saveImageOrc = (cb) => {
  */
 const setEditStatus = (index, status) => {
   currentResult.value = currentResult.value.map((it, ix) => {
+    if (it.isEdit) {
+      // 清除上一个框选中
+      setEditItemDraw(it, "green");
+    }
     return {
       ...it,
       isEdit: ix === index ? status : false,
@@ -428,8 +436,34 @@ const handleToScaleBig = () => {
 };
 
 // 确定删除
-const handleConfirm = (index) => {
- 
+const handleDelete = (deleteIndex) => {
+  const sourceId = currentImage.value?.sourceId;
+  const imageUrl = currentImage.value?.imageUrl;
+  const results = currentResult.value.filter((_, index) => {
+    return index !== deleteIndex;
+  });
+  const params = {
+    sourceId,
+    imageUrl,
+    result: results.map((item) => {
+      return {
+        boxID: item?.text,
+        ocrText: item?.ocrText,
+        confidence: item?.confidence,
+        vendor: ocrType.value,
+        location: item?.location,
+      };
+    }),
+  };
+  saveImageOrcApi(params).then((res) => {
+    message.success("删除成功");
+    currentResult.value = results;
+    resultList.value[currentPage.value] = results;
+    currentImage.value.result = results;
+    imageList.value[currentPage.value - 1].result = results;
+    filterData(currentResult.value);
+    console.log(resultList.value, imageList.value)
+  });
 };
 
 // 取消删除
@@ -441,6 +475,8 @@ onMounted(() => {
   getBodySize();
   setBodyContentSize();
   getImageList();
+
+
 });
 </script>
 
@@ -450,23 +486,13 @@ onMounted(() => {
       <div class="container">
         <div class="control-list">
           <div class="control-item">
-            <a-date-picker
-              value-format="YYYY-MM-DD"
-              v-model:value="currentDay"
-              format="YYYY-MM-DD"
-            />
-            <a-button class="control-btn" @click="handleLoadDay"
-              >加载当天</a-button
-            >
+            <a-date-picker value-format="YYYY-MM-DD" v-model:value="currentDay" format="YYYY-MM-DD" />
+            <a-button class="control-btn" @click="handleLoadDay">加载当天</a-button>
           </div>
 
           <div class="control-item">
             <div class="ocr-type">OCR识别：</div>
-            <a-radio-group
-              @change="handleOcrTypeChange"
-              v-model:value="ocrType"
-              button-style="solid"
-            >
+            <a-radio-group @change="handleOcrTypeChange" v-model:value="ocrType" button-style="solid">
               <a-radio-button value="BAI_DU">百度</a-radio-button>
               <!-- <a-radio-button value="XUN_FEI">讯飞</a-radio-button>
               <a-radio-button value="GU_GE">谷歌</a-radio-button> -->
@@ -477,13 +503,8 @@ onMounted(() => {
         <div class="body" id="body">
           <div class="auto-box">
             <div class="body-content" :style="{ transform: transform }">
-              <img
-                class="body-content-img"
-                :src="currentImage?.imageUrl"
-                @load="onImageLoad"
-                @error="onImageError"
-                alt=""
-              />
+              <img class="body-content-img" v-show="currentImage?.imageUrl" :src="currentImage?.imageUrl"
+                @load="onImageLoad" @error="onImageError" alt="" />
               <canvas ref="canvas" class="body-content-canvas"></canvas>
             </div>
           </div>
@@ -492,12 +513,8 @@ onMounted(() => {
         <div class="control-list">
           <div class="control-item">
             <div class="ratio-value">{{ rotateValue }}°</div>
-            <a-button class="control-btn" @click="handleToChange"
-              >右转90°</a-button
-            >
-            <a-button class="control-btn" @click="handleLoadOcr"
-              >加载当前角度数据</a-button
-            >
+            <a-button class="control-btn" @click="handleToChange">右转90°</a-button>
+            <a-button class="control-btn" @click="handleLoadOcr">加载当前角度数据</a-button>
           </div>
           <div class="control-item">
             <a-button class="control-btn" @click="handlePrev">上一页</a-button>
@@ -508,42 +525,23 @@ onMounted(() => {
           </div>
 
           <div class="control-item">
-            <a-button class="control-btn" @click="handleExport"
-              >导出数据</a-button
-            >
+            <a-button class="control-btn" @click="handleExport">导出数据</a-button>
           </div>
 
           <div class="control-item">
-            <a-button class="control-btn" @click="handleToScaleSmall"
-              >缩小</a-button
-            >
-            <a-button class="control-btn" @click="handleToScaleBig"
-              >放大</a-button
-            >
+            <a-button class="control-btn" @click="handleToScaleSmall">缩小</a-button>
+            <a-button class="control-btn" @click="handleToScaleBig">放大</a-button>
           </div>
         </div>
       </div>
       <div class="result-list">
-        <div
-          class="result-item"
-          v-for="(item, index) in showCurrentResult"
-          :key="index"
-        >
-          <a-input
-            :disabled="!item.isEdit"
-            v-model:value="item.text"
-            placeholder="手动新增编号"
-          />
+        <div class="result-item" v-for="(item, index) in showCurrentResult" :key="index">
+          <a-input :disabled="!item.isEdit" v-model:value="item.text" placeholder="手动新增编号" />
           <a-button class="control-btn" @click="handleEdit(index)">
             {{ item.isEdit ? "保存" : "编辑" }}
           </a-button>
-          <a-popconfirm
-            title="确定删除吗?"
-            ok-text="确定"
-            cancel-text="取消"
-            @confirm="handleDelete"
-            @cancel="handleCancel"
-          >
+          <a-popconfirm title="确定删除吗?" ok-text="确定" cancel-text="取消" @confirm="handleDelete(index)"
+            @cancel="handleCancel">
             <a-button class="control-btn" danger>
               删除
             </a-button>
@@ -551,9 +549,7 @@ onMounted(() => {
         </div>
         <div class="result-item">
           <a-input v-model:value="customNumber" placeholder="手动新增编号" />
-          <a-button class="control-btn" @click="handleCustomAdd"
-            >手动添加</a-button
-          >
+          <a-button class="control-btn" @click="handleCustomAdd">手动添加</a-button>
         </div>
       </div>
 
@@ -565,16 +561,20 @@ onMounted(() => {
 </template>
 
 <style lang="less" scoped>
+:deep(.ant-input) {
+  color: #333;
+}
 .container-box {
   width: 100vw;
   height: 100vh;
   min-width: 1920px;
   min-height: 1080px;
-  padding:1rem 3rem;
+  padding: 1rem 3rem;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
   min-width: calc(1000px + 12rem);
+
   .loading-box {
     position: absolute;
     top: 0;
@@ -587,11 +587,13 @@ onMounted(() => {
     align-items: center;
     color: white;
   }
+
   .result-list {
     padding-top: 4rem;
     box-sizing: border-box;
-    width: 246px;
+    width: 346px;
     margin-left: 10px;
+
     .result-item {
       display: flex;
       align-items: center;
@@ -603,10 +605,12 @@ onMounted(() => {
     }
   }
 }
+
 .container {
   position: relative;
-  width:calc(100% - 246px);
+  width: calc(100% - 346px);
   height: calc(100%);
+
   .control-btn {
     margin-left: 6px;
   }
@@ -617,6 +621,7 @@ onMounted(() => {
     background-color: rgba(0, 0, 0, 0.1);
     overflow: auto;
     position: relative;
+
     .auto-box {
       width: 100%;
       height: 100%;
@@ -624,17 +629,20 @@ onMounted(() => {
       align-items: center;
       justify-content: center;
     }
+
     .body-content {
       width: 0px;
       height: 0px;
       position: relative;
       transform-origin: center center;
+
       .body-content-img {
         display: block;
         width: 100%;
         height: 100%;
         object-fit: contain;
       }
+
       .body-content-canvas {
         position: absolute;
         top: 0;
@@ -646,9 +654,11 @@ onMounted(() => {
       &.rotate-90 {
         transform: rotate(90deg);
       }
+
       &.rotate-180 {
         transform: rotate(180deg);
       }
+
       &.rotate-270 {
         transform: rotate(270deg);
       }
@@ -660,11 +670,13 @@ onMounted(() => {
     width: 100%;
     display: flex;
     align-items: center;
+
     .control-item {
       display: flex;
       align-items: center;
       margin-right: 1rem;
     }
+
     .ratio-value {
       color: black;
     }
