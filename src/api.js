@@ -1,7 +1,7 @@
 import { message } from "ant-design-vue";
 
-// export const proxyUrl = "http://yingyunkeji.top/";
-export const proxyUrl = "/";
+export const proxyUrl = "http://yingyunkeji.top/";
+// export const proxyUrl = "/";
 export const Fetch = (url, params, options = {}) => {
   const newOptions = {
     method: "POST",

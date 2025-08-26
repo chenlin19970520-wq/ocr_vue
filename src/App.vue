@@ -14,7 +14,7 @@ import { changeSizeFunc } from "./size.js";
 import { drawItem, removeItem, clearCanvas } from "./draw.js";
 import { message, Spin, Radio, RadioGroup, Popconfirm as APopconfirm } from "ant-design-vue";
 const canvas = ref(null);
-const currentDay = ref(dayjs("2025-08-14").format("YYYY-MM-DD"));
+const currentDay = ref(dayjs().format("YYYY-MM-DD"));
 const ratio = ref(1); // 比例
 const rotateValue = ref(0); // 旋转角度
 const scale = ref(1); // 缩放比例
@@ -567,13 +567,13 @@ onMounted(() => {
 .container-box {
   width: 100vw;
   height: 100vh;
-  min-width: 1920px;
-  min-height: 1080px;
+  // min-width: 1920px;
+    // min-height: 1080px;
   padding: 1rem 3rem;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
-  min-width: calc(1000px + 12rem);
+  // min-width: calc(1000px + 12rem);
 
   .loading-box {
     position: absolute;
