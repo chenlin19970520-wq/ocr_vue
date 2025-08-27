@@ -1,7 +1,7 @@
 import { message } from "ant-design-vue";
 
-export const proxyUrl = "http://yingyunkeji.top/";
-// export const proxyUrl = "/";
+// export const proxyUrl = "http://yingyunkeji.top/";
+export const proxyUrl = "/";
 export const Fetch = (url, params, options = {}) => {
   const newOptions = {
     method: "POST",
@@ -115,4 +115,11 @@ export const saveImageOrcApi = (params) => {
  */
 export const exportApi = (params) => {
   return Download(`${proxyUrl}api/images/export`, params);
+};
+
+/**
+ * 权限接口
+ */
+export const getAuthApi = (params) => {
+  return Fetch(`${proxyUrl}api/ocr/auth`, params, { method: "GET" });
 };

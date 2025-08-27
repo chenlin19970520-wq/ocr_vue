@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, ref, computed } from "vue";
+import { onMounted, ref, computed, nextTick } from "vue";
+import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import zhCN from "ant-design-vue/es/locale/zh_CN";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
@@ -9,10 +10,17 @@ import {
   getImageListApi,
   saveImageOrcApi,
   exportApi,
+  getAuthApi,
 } from "./api.js";
 import { changeSizeFunc } from "./size.js";
 import { drawItem, removeItem, clearCanvas } from "./draw.js";
-import { message, Spin, Radio, RadioGroup, Popconfirm as APopconfirm } from "ant-design-vue";
+import {
+  message,
+  Spin,
+  Radio,
+  RadioGroup,
+  Popconfirm as APopconfirm,
+} from "ant-design-vue";
 const canvas = ref(null);
 const currentDay = ref(dayjs().format("YYYY-MM-DD"));
 const ratio = ref(1); // 比例
@@ -20,6 +28,7 @@ const rotateValue = ref(0); // 旋转角度
 const scale = ref(1); // 缩放比例
 const loading = ref(false); // 加载
 const currentPage = ref(1); // 当前页
+const jumpPageNumber = ref(null); // 跳转页
 const size = ref(1); // 每页大小
 const totalPage = ref(1); // 总页数
 const imageList = ref([]); // 图片列表
@@ -27,7 +36,7 @@ const currentImage = ref({}); // 当前图片
 const resultList = ref([]); // 结果列表
 const currentResult = ref([]); // 当前结果
 const ocrType = ref("BAI_DU"); // OCR识别类型 百度或讯飞
-
+const sessionKey = ref(); // key
 const bodySize = ref({
   width: 0,
   height: 0,
@@ -43,6 +52,10 @@ const showCurrentResult = computed(() => {
   return currentResult.value.filter((item) => {
     return item.text !== "__NO_OCR_RESULT__";
   });
+});
+
+const imgUploadTime = computed(() => {
+  return dayjs(currentImage.value?.uploadTime).format("YYYY-MM-DD HH:mm:ss");
 });
 
 // 格式化orc识别结果
@@ -119,7 +132,7 @@ const setBodyContentSize = () => {
   const bodyContent = document.querySelector(".body-content");
   bodyContent.style.width = bodySize.value.width + "px";
   bodyContent.style.height = bodySize.value.height + "px";
-}
+};
 
 // 获取滚动框的大小
 const getBodySize = () => {
@@ -128,8 +141,8 @@ const getBodySize = () => {
   bodySize.value = {
     width,
     height,
-  }
-}
+  };
+};
 
 // 根据图片原始宽高获取当前图片宽高
 const getCurrentSize = (img) => {
@@ -241,18 +254,20 @@ const getImageList = () => {
   resetCurrentResult();
   clearCanvas(canvas.value);
   loading.value = true;
-  getImageListApi(params).then((res) => {
-    const currentItem = res.list[0];
-    imageList.value[currentPage.value - 1] = currentItem;
-    totalPage.value = res?.total;
-    if (imageList.value.length) {
-      setCurrentImage();
-    }
-  }).catch(err => {
-    console.log(err)
-    loading.value = false;
-    message.error(err.msg)
-  })
+  getImageListApi(params)
+    .then((res) => {
+      const currentItem = res.list[0];
+      imageList.value[currentPage.value - 1] = currentItem;
+      totalPage.value = res?.total;
+      if (imageList.value.length) {
+        setCurrentImage();
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+      loading.value = false;
+      message.error(err.msg);
+    });
 };
 
 /**
@@ -262,7 +277,7 @@ const handleResetTransform = () => {
   scale.value = 1;
   rotateValue.value = 0;
   handleSetSize();
-}
+};
 
 /**
  * 上一页
@@ -286,6 +301,40 @@ const handleNext = () => {
     } else {
       getImageList();
     }
+  }
+};
+// 首页
+const handleToFirst = () => {
+  currentPage.value = 1;
+  handleResetTransform();
+  if (imageList.value[currentPage.value - 1]) {
+    setCurrentImage();
+  } else {
+    getImageList();
+  }
+};
+// 尾页
+const handleToLast = () => {
+  currentPage.value = totalPage.value;
+  handleResetTransform();
+  if (imageList.value[currentPage.value - 1]) {
+    setCurrentImage();
+  } else {
+    getImageList();
+  }
+};
+
+const handleToNumber = () => {
+  if (jumpPageNumber.value >= 1 && jumpPageNumber.value <= totalPage.value) {
+    currentPage.value = jumpPageNumber.value;
+    handleResetTransform();
+    if (imageList.value[currentPage.value - 1]) {
+      setCurrentImage();
+    } else {
+      getImageList();
+    }
+  } else {
+    message.error("请输入正确的页码");
   }
 };
 
@@ -408,7 +457,6 @@ const handleExport = () => {
   exportApi(params);
 };
 
-
 // 设置auto-box大小
 const handleSetSize = () => {
   const autoBox = document.querySelector(".auto-box");
@@ -462,100 +510,171 @@ const handleDelete = (deleteIndex) => {
     currentImage.value.result = results;
     imageList.value[currentPage.value - 1].result = results;
     filterData(currentResult.value);
-    console.log(resultList.value, imageList.value)
+    console.log(resultList.value, imageList.value);
   });
 };
 
 // 取消删除
-const handleCancel = (index) => {
+const handleCancel = (index) => {};
 
+// 从地址栏中获取sessionKey
+const getSessionKey = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const session = urlParams.get("session");
+  if (session) {
+    getAuthApi({ session }).then((res) => {
+      console.log(res, "--");
+      if (res) {
+        sessionKey.value = session;
+        nextTick(() => {
+          getBodySize();
+          setBodyContentSize();
+          getImageList();
+        });
+      }
+    });
+  }
 };
 
-onMounted(() => {
-  getBodySize();
-  setBodyContentSize();
-  getImageList();
+getSessionKey();
 
-
-});
+// onMounted(() => {
+//   getBodySize();
+//   setBodyContentSize();
+//   getImageList();
+// });
 </script>
 
 <template>
   <a-config-provider :locale="zhCN">
-    <div class="container-box">
-      <div class="container">
-        <div class="control-list">
-          <div class="control-item">
-            <a-date-picker value-format="YYYY-MM-DD" v-model:value="currentDay" format="YYYY-MM-DD" />
-            <a-button class="control-btn" @click="handleLoadDay">加载当天</a-button>
-          </div>
-
-          <div class="control-item">
-            <div class="ocr-type">OCR识别：</div>
-            <a-radio-group @change="handleOcrTypeChange" v-model:value="ocrType" button-style="solid">
-              <a-radio-button value="BAI_DU">百度</a-radio-button>
-              <!-- <a-radio-button value="XUN_FEI">讯飞</a-radio-button>
-              <a-radio-button value="GU_GE">谷歌</a-radio-button> -->
-            </a-radio-group>
-          </div>
+    <div class="page-box" v-if="sessionKey">
+      <div class="control-list">
+        <div class="control-item">
+          <a-date-picker
+            value-format="YYYY-MM-DD"
+            v-model:value="currentDay"
+            format="YYYY-MM-DD"
+          />
+          <a-button class="control-btn" @click="handleLoadDay"
+            >加载当天</a-button
+          >
         </div>
 
-        <div class="body" id="body">
-          <div class="auto-box">
-            <div class="body-content" :style="{ transform: transform }">
-              <img class="body-content-img" v-show="currentImage?.imageUrl" :src="currentImage?.imageUrl"
-                @load="onImageLoad" @error="onImageError" alt="" />
-              <canvas ref="canvas" class="body-content-canvas"></canvas>
-            </div>
-          </div>
+        <div class="control-item">
+          <div class="ocr-type">OCR识别：</div>
+          <a-radio-group
+            @change="handleOcrTypeChange"
+            v-model:value="ocrType"
+            button-style="solid"
+          >
+            <a-radio-button value="BAI_DU">百度</a-radio-button>
+            <!-- <a-radio-button value="XUN_FEI">讯飞</a-radio-button>
+          <a-radio-button value="GU_GE">谷歌</a-radio-button> -->
+          </a-radio-group>
         </div>
 
-        <div class="control-list">
-          <div class="control-item">
-            <div class="ratio-value">{{ rotateValue }}°</div>
-            <a-button class="control-btn" @click="handleToChange">右转90°</a-button>
-            <a-button class="control-btn" @click="handleLoadOcr">加载当前角度数据</a-button>
-          </div>
-          <div class="control-item">
-            <a-button class="control-btn" @click="handlePrev">上一页</a-button>
-            <div class="pagination-value">
-              {{ currentPage }}/{{ totalPage || 1 }}
-            </div>
-            <a-button class="control-btn" @click="handleNext">下一页</a-button>
-          </div>
-
-          <div class="control-item">
-            <a-button class="control-btn" @click="handleExport">导出数据</a-button>
-          </div>
-
-          <div class="control-item">
-            <a-button class="control-btn" @click="handleToScaleSmall">缩小</a-button>
-            <a-button class="control-btn" @click="handleToScaleBig">放大</a-button>
-          </div>
-        </div>
+        <div class="control-item">图片上传时间：{{ imgUploadTime }}</div>
       </div>
-      <div class="result-list">
-        <div class="result-item" v-for="(item, index) in showCurrentResult" :key="index">
-          <a-input :disabled="!item.isEdit" v-model:value="item.text" placeholder="手动新增编号" />
-          <a-button class="control-btn" @click="handleEdit(index)">
-            {{ item.isEdit ? "保存" : "编辑" }}
-          </a-button>
-          <a-popconfirm title="确定删除吗?" ok-text="确定" cancel-text="取消" @confirm="handleDelete(index)"
-            @cancel="handleCancel">
-            <a-button class="control-btn" danger>
-              删除
+      <div class="container-box">
+        <div class="container">
+          <div class="body" id="body">
+            <div class="auto-box">
+              <div class="body-content" :style="{ transform: transform }">
+                <img
+                  class="body-content-img"
+                  v-show="currentImage?.imageUrl"
+                  :src="currentImage?.imageUrl"
+                  @load="onImageLoad"
+                  @error="onImageError"
+                  alt=""
+                />
+                <canvas ref="canvas" class="body-content-canvas"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-list">
+          <div
+            class="result-item"
+            v-for="(item, index) in showCurrentResult"
+            :key="index"
+          >
+            <a-input
+              :disabled="!item.isEdit"
+              v-model:value="item.text"
+              placeholder="手动新增编号"
+            />
+            <a-button class="control-btn" @click="handleEdit(index)">
+              {{ item.isEdit ? "保存" : "编辑" }}
             </a-button>
-          </a-popconfirm>
+            <a-popconfirm
+              title="确定删除吗?"
+              ok-text="确定"
+              cancel-text="取消"
+              @confirm="handleDelete(index)"
+              @cancel="handleCancel"
+            >
+              <a-button class="control-btn" danger> 删除 </a-button>
+            </a-popconfirm>
+          </div>
+          <div class="result-item">
+            <a-input v-model:value="customNumber" placeholder="手动新增编号" />
+            <a-button class="control-btn" @click="handleCustomAdd"
+              >手动添加</a-button
+            >
+          </div>
         </div>
-        <div class="result-item">
-          <a-input v-model:value="customNumber" placeholder="手动新增编号" />
-          <a-button class="control-btn" @click="handleCustomAdd">手动添加</a-button>
-        </div>
-      </div>
 
-      <div class="loading-box" v-if="loading">
-        <Spin />
+        <div class="loading-box" v-if="loading">
+          <Spin />
+        </div>
       </div>
+      <div class="control-list">
+        <div class="control-item">
+          <div class="ratio-value">{{ rotateValue }}°</div>
+          <a-button class="control-btn" @click="handleToChange"
+            >右转90°</a-button
+          >
+          <a-button class="control-btn" @click="handleLoadOcr"
+            >加载当前角度数据</a-button
+          >
+        </div>
+        <div class="control-item">
+          <a-button class="control-btn" @click="handleToFirst">首页</a-button>
+          <a-button class="control-btn" @click="handlePrev">上一页</a-button>
+          <div class="pagination-value">
+            {{ currentPage }}/{{ totalPage || 1 }}
+          </div>
+          <a-button class="control-btn" @click="handleNext">下一页</a-button>
+          <a-button class="control-btn" @click="handleToLast">尾页</a-button>
+          <a-input
+            placeholder="输入页码"
+            v-model:value="jumpPageNumber"
+            style="width: 100px"
+          ></a-input>
+          <a-button class="control-btn" @click="handleToNumber">跳转</a-button>
+        </div>
+
+        <div class="control-item">
+          <a-button class="control-btn" @click="handleExport"
+            >导出数据</a-button
+          >
+        </div>
+
+        <div class="control-item">
+          <a-button class="control-btn" @click="handleToScaleSmall"
+            >缩小</a-button
+          >
+          <a-button class="control-btn" @click="handleToScaleBig"
+            >放大</a-button
+          >
+        </div>
+      </div>
+    </div>
+    <div class="no-permission" v-else>
+      <ExclamationCircleOutlined style="font-size: 48px; color: #ff4d4f" />
+      <div class="no-permission-title">您没有权限访问该页面</div>
     </div>
   </a-config-provider>
 </template>
@@ -564,12 +683,32 @@ onMounted(() => {
 :deep(.ant-input) {
   color: #333;
 }
-.container-box {
+.page-box {
   width: 100vw;
   height: 100vh;
+}
+.no-permission {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f0f2f5;
+  font-size: 24px;
+  color: #ff4d4f;
+  flex-direction: column;
+}
+
+.no-permission-title {
+  margin-top: 20px;
+  font-weight: bold;
+}
+
+.container-box {
+  width: 100vw;
+  height: calc(100vh - 120px);
   // min-width: 1920px;
-    // min-height: 1080px;
-  padding: 1rem 3rem;
+  // min-height: 1080px;
+  padding: 0rem 2rem;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
@@ -589,7 +728,6 @@ onMounted(() => {
   }
 
   .result-list {
-    padding-top: 4rem;
     box-sizing: border-box;
     width: 346px;
     margin-left: 10px;
@@ -617,7 +755,7 @@ onMounted(() => {
 
   .body {
     width: 100%;
-    height: calc(100% - 8rem);
+    height: 100%;
     background-color: rgba(0, 0, 0, 0.1);
     overflow: auto;
     position: relative;
@@ -664,27 +802,28 @@ onMounted(() => {
       }
     }
   }
+}
+.control-list {
+  padding: 1rem 2rem;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
 
-  .control-list {
-    margin: 1rem 0rem;
-    width: 100%;
+  .control-item {
     display: flex;
     align-items: center;
+    margin-right: 1rem;
+    gap: 0.5rem;
+  }
 
-    .control-item {
-      display: flex;
-      align-items: center;
-      margin-right: 1rem;
-    }
+  .ratio-value {
+    color: black;
+  }
 
-    .ratio-value {
-      color: black;
-    }
-
-    .pagination-value {
-      display: flex;
-      margin-left: 6px;
-    }
+  .pagination-value {
+    display: flex;
+    margin-left: 6px;
   }
 }
 </style>
