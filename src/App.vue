@@ -523,7 +523,6 @@ const getSessionKey = () => {
   const session = urlParams.get("session");
   if (session) {
     getAuthApi({ session }).then((res) => {
-      console.log(res, "--");
       if (res) {
         sessionKey.value = session;
         nextTick(() => {
