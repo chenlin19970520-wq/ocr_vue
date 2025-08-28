@@ -286,7 +286,11 @@ const handlePrev = () => {
   if (currentPage.value > 1) {
     currentPage.value--;
     handleResetTransform();
-    setCurrentImage();
+    if (imageList.value[currentPage.value - 1]) {
+      setCurrentImage();
+    } else {
+      getImageList();
+    }
   }
 };
 /**
